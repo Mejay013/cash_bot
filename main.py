@@ -63,9 +63,9 @@ def get_text_messages(message):
                 bank += sum
                 if not (db.save_history(cursor,event,message.from_user.id,sum, bank)):
                     raise Exception
-                send_message(user_list[0], f'Внесение денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!) 
-                # for user in user_list:
-                #     send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
+                #send_message(user_list[0], f'Внесение денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!) 
+                for user in user_list:
+                    send_message(user_list, f'Внесение денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True)
             elif event == 'cash_out':
                 sum = int(message.text.strip())
                 user_name = db.get_user_name(cursor,message.from_user.id)
@@ -74,11 +74,9 @@ def get_text_messages(message):
                 bank -= sum
                 if not (db.save_history(cursor,event,message.from_user.id,sum,bank)):
                     raise Exception
-                send_message(user_list[0], f'Снятие денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!)
-                
-                # for user in user_list:
-                #     send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
-            print('kek')
+                # send_message(user_list[0], f'Снятие денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!)
+                for user in user_list:
+                    send_message(user_list, f'Снятие денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True)
             if not (db.update_bank(cursor,bank)):
                 raise Exception
             conn.commit()
