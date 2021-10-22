@@ -1,14 +1,15 @@
 from datetime import datetime
+from logging import raiseExceptions
 import telebot
 from telebot import types
 import config
+import db
 
 
 
 bot = telebot.TeleBot(config.token)
 keyboard = types.InlineKeyboardMarkup()
 event = None
-bank = 0
 
 def send_message(user_id, text, check_keyboard = False):
     global bot, keyboard
@@ -21,12 +22,11 @@ def send_message(user_id, text, check_keyboard = False):
 @bot.message_handler(commands=['start']) # вступителная функция
 def start_message(message):
     set_keyboard()
-    send_message(message.from_user.id, 'Напиши сюда чото', True) 
+    send_message(message.from_user.id, 'Выбираем', True) 
 
 @bot.callback_query_handler(func=lambda call: True) #обработка кнопок
 def callback_worker(call):
     global event
-    global bank
     if call.data == "cash_in":
         event = 'cash_in'
         send_message(call.message.chat.id, 'Введите сумму внесения')
@@ -34,7 +34,10 @@ def callback_worker(call):
         event = 'cash_out'
         send_message(call.message.chat.id, 'Введите сумму снятия')
     elif call.data == "cash_check":
+        conn,cursor = db.connect()
+        bank = db.get_bank(cursor)
         send_message(call.message.chat.id, f'Сумма бюджета = {bank} рублей',True)
+        db.close_connect(conn,cursor)
     
 
 def set_keyboard():
@@ -47,26 +50,44 @@ def set_keyboard():
 
 @bot.message_handler(content_types=['text']) #обработка текстовых сообщений
 def get_text_messages(message):
-    global bank
-    try:    
-        if event != None and message.from_user.id in config.access_id:
-            print(message.from_user.id, event)
+    try:  
+        conn,cursor = db.connect()
+        user_list = db.get_users(cursor)
+        bank = db.get_bank(cursor)
+        if event != None and message.from_user.id in user_list:
             if event == 'cash_in':
                 sum = int(message.text.strip())
+                user_name = db.get_user_name(cursor,message.from_user.id)
                 if not sum > 0:
                     raise ValueError
                 bank += sum
-                for user in config.access_id:
-                    send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
+                if not (db.save_history(cursor,event,message.from_user.id,sum, bank)):
+                    raise Exception
+                send_message(user_list[0], f'Внесение денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!) 
+                # for user in user_list:
+                #     send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
             elif event == 'cash_out':
                 sum = int(message.text.strip())
+                user_name = db.get_user_name(cursor,message.from_user.id)
                 if not sum > 0:
                     raise ValueError
                 bank -= sum
-                for user in config.access_id:
-                    send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
+                if not (db.save_history(cursor,event,message.from_user.id,sum,bank)):
+                    raise Exception
+                send_message(user_list[0], f'Снятие денег {user_name}: {sum} рублей \nСумма бюджета составляет: {bank} рублей', True) #(!)
+                
+                # for user in user_list:
+                #     send_message(user, f'Внесение учтено \nСумма бюджета составляет: {bank} рублей', True)
+            print('kek')
+            if not (db.update_bank(cursor,bank)):
+                raise Exception
+            conn.commit()
+            db.close_connect(conn,cursor)
     except ValueError:
         send_message(message.from_user.id, 'Введен неверный формат', False)
+    except Exception as e:
+        print(e)
+        send_message(message.from_user.id, 'Я сломался', False)
 
 
 
